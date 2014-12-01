@@ -49,10 +49,11 @@ public class CPABE {
 		
 //		SerializeUtils.serialize(PK, PKFile);
 //		SerializeUtils.serialize(MK, MKFile);
-		String[] attrs = new String[]{"PKU", "Student"};
+		String[] attrs = new String[]{"PKU0", "PKU2", "PKU4"};
 		SecretKey SK = keygen(attrs, PK, MK, null);
 		Policy p = testPolicy();
-		Element m = pairing.getGT().newElement().setToOne();
+		Element m = pairing.getGT().newElement().setToRandom();
+		System.out.println(m);
 		Ciphertext ciphertext = enc(p, m, PK);
 		dec(ciphertext, SK, PK);
 	}
@@ -60,16 +61,14 @@ public class CPABE {
 	private static Policy testPolicy(){
 		Policy root = new Policy();
 		root.children = new ArrayList<Policy>();
-		root.k = 2;
-		Policy child1 = new Policy();
-		child1.attr = "Student";
-		child1.k = 1;
+		root.k = 3;
 		
-		Policy child2 = new Policy();
-		child2.attr = "PKU";
-		child1.k = 1;
-		root.children.add(child1);
-		root.children.add(child2);
+		for(int i=0; i<5; i++){
+			Policy child = new Policy();
+			child.attr = "PKU" + i;
+			child.k = 1;
+			root.children.add(child);
+		}
 		return root;
 	}
 	
@@ -117,7 +116,7 @@ public class CPABE {
 		fill_policy(p, s, PK);
 		Ciphertext ciphertext = new Ciphertext();
 		ciphertext.p = p;
-		ciphertext.Cs = PK.g_hat_alpha.duplicate().powZn(s);
+		ciphertext.Cs = m.mul(PK.g_hat_alpha.duplicate().powZn(s));
 		ciphertext.C = PK.h.duplicate().powZn(s); 
 		
 		return ciphertext;
