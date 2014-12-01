@@ -50,7 +50,27 @@ public class CPABE {
 //		SerializeUtils.serialize(PK, PKFile);
 //		SerializeUtils.serialize(MK, MKFile);
 		String[] attrs = new String[]{"PKU", "Student"};
-		keygen(attrs, PK, MK, null);
+		SecretKey SK = keygen(attrs, PK, MK, null);
+		Policy p = testPolicy();
+		Element m = pairing.getGT().newElement().setToOne();
+		Ciphertext ciphertext = enc(p, m, PK);
+		dec(ciphertext, SK, PK);
+	}
+	
+	private static Policy testPolicy(){
+		Policy root = new Policy();
+		root.children = new ArrayList<Policy>();
+		root.k = 2;
+		Policy child1 = new Policy();
+		child1.attr = "Student";
+		child1.k = 1;
+		
+		Policy child2 = new Policy();
+		child2.attr = "PKU";
+		child1.k = 1;
+		root.children.add(child1);
+		root.children.add(child2);
+		return root;
 	}
 	
 	public static void setup(){
@@ -59,7 +79,7 @@ public class CPABE {
 		setup(pk, mk);
 	}
 
-	public static void keygen(String[] attrs, PublicKey PK, MasterKey MK, String SKFileName){
+	public static SecretKey keygen(String[] attrs, PublicKey PK, MasterKey MK, String SKFileName){
 		if(SKFileName == null || SKFileName.trim().equals("")){
 			SKFileName = "SecretKey";
 		}
@@ -87,16 +107,20 @@ public class CPABE {
 			SK.comps[i].Dj = g_r.mul(hash);
 			SK.comps[i]._Dj = PK.gp.duplicate().powZn(rj);
 		}
+		
+		return SK;
 //		SerializeUtils.serialize(SK, SKFile);
 	}
 
-	public static void enc(Policy p, Element m, PublicKey PK){
-		fill_policy(p, m, PK);
+	public static Ciphertext enc(Policy p, Element m, PublicKey PK){
+		Element s = pairing.getZr().newElement().setToRandom();
+		fill_policy(p, s, PK);
 		Ciphertext ciphertext = new Ciphertext();
 		ciphertext.p = p;
-		Element s = pairing.getZr().newElement().setToRandom();
 		ciphertext.Cs = PK.g_hat_alpha.duplicate().powZn(s);
 		ciphertext.C = PK.h.duplicate().powZn(s); 
+		
+		return ciphertext;
 	}
 
 	public static void dec(Ciphertext ciphertext, SecretKey SK, PublicKey PK){
@@ -111,11 +135,12 @@ public class CPABE {
 		r = pairing.pairing(ciphertext.C, SK.D);
 		r.invert();
 		m.mul(r);
+		System.out.println("dec:" + m);
 	}
 	
 	private static Element dec_flatten(Policy p, SecretKey SK){
-		Element r = PairingManager.defaultPairing.getGT().newElement().setToOne();
-		Element one = PairingManager.defaultPairing.getZr().newElement().setToOne();
+		Element r = pairing.getGT().newElement().setToOne();
+		Element one = pairing.getZr().newElement().setToOne();
 		dec_node_flatten(r, one, p, SK);
 		return r;
 	}
@@ -123,7 +148,7 @@ public class CPABE {
 	private static void dec_node_flatten(Element r, Element exp, 
 			Policy p, SecretKey SK){
 		assert(p.satisfiable == 1);
-		if(p.children.size() == 0){
+		if(p.children == null || p.children.size() == 0){
 			dec_leaf_flatten(r, exp, p, SK);
 		}
 		else{
@@ -147,7 +172,7 @@ public class CPABE {
 		int i;
 		Element t;
 		Element expnew;
-		Element zero = PairingManager.defaultPairing.getZr().newElement().setToZero();
+		Element zero = pairing.getZr().newElement().setToZero();
 		
 		for(i=0; i<p.satl.size(); i++){
 			t = lagrange_coef(p.satl, p.satl.get(i), zero);
@@ -161,7 +186,7 @@ public class CPABE {
 		int i,k,l;
 		Integer[] c;
 		assert(p.satisfiable == 1);
-		if(p.children.size() == 0){
+		if(p.children == null || p.children.size() == 0){
 			p.min_leaves = 1;
 		}
 		else{
@@ -212,7 +237,7 @@ public class CPABE {
 	private static void check_sat(SecretKey SK, Policy p){
 		int i,l;
 		p.satisfiable = 0;
-		if(p.children.size() == 0){
+		if(p.children == null || p.children.size() == 0){
 			for(i=0; i<SK.comps.length; i++){
 				if(SK.comps[i].attr.equals(p.attr)){
 					p.satisfiable = 1;
@@ -243,13 +268,13 @@ public class CPABE {
 		int i;
 		Element r, t;
 		p.q = rand_poly(p.k - 1, e);
-		if(p.children.size() == 0){
+		if(p.children == null || p.children.size() == 0){
 			p.Cy = PK.g.duplicate().powZn(p.q.coef.get(0));
 			p._Cy = pairing.getG1().newElementFromBytes(p.attr.getBytes()).powZn(p.q.coef.get(0));
 		}
 		else{
 			for(i=0; i<p.children.size(); i++){
-				r = PairingManager.defaultPairing.getZr().newElement().set(i+1);
+				r = pairing.getZr().newElement().set(i+1);
 				t = Polynomial.eval_poly(p.q, r);
 				fill_policy(p.children.get(i), t, PK);
 			}
@@ -264,7 +289,7 @@ public class CPABE {
 
 		q.coef.add(zero_val.duplicate());
 		for(i=1; i<q.deg+1; i++){
-			q.coef.add(PairingManager.defaultPairing.getZr().newElement().setToRandom());
+			q.coef.add(pairing.getZr().newElement().setToRandom());
 		}
 		
 		return q;
@@ -272,14 +297,14 @@ public class CPABE {
 	
 	public static Element lagrange_coef(List<Integer> S, int i, Element x){
 		int j,k;
-		Element r = PairingManager.defaultPairing.getZr().newElement().setToOne();
+		Element r = pairing.getZr().newElement().setToOne();
 		Element t;
 		for(k=0; k<S.size(); k++){
 			j = S.get(k);
 			if(j == i){
 				continue;
 			}
-			t = x.duplicate().sub(PairingManager.defaultPairing.getZr().newElement().set(j));   //注意这里的duplicate
+			t = x.duplicate().sub(pairing.getZr().newElement().set(j));   //注意这里的duplicate
 			r.mul(t);
 			t.set(i-j).invert();
 			r.mul(t);
