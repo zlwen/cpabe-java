@@ -51,11 +51,11 @@ public class CPABE {
 //		SerializeUtils.serialize(MK, MKFile);
 		String[] attrs = new String[]{"PKU0", "PKU2", "PKU4"};
 		SecretKey SK = keygen(attrs, PK, MK, null);
-		Policy p = testPolicy();
-		Element m = pairing.getGT().newElement().setToRandom();
-		System.out.println(m);
-		Ciphertext ciphertext = enc(p, m, PK);
-		dec(ciphertext, SK, PK);
+//		Policy p = testPolicy();
+//		Element m = pairing.getGT().newElement().setToRandom();
+//		System.out.println(m);
+//		Ciphertext ciphertext = enc(p, m, PK);
+//		dec(ciphertext, SK, PK);
 	}
 	
 	private static Policy testPolicy(){
@@ -109,8 +109,11 @@ public class CPABE {
 			SK.comps[i]._Dj = PK.gp.duplicate().powZn(rj);
 		}
 		
+		SerializeUtils.serialize(SK, SKFile);
+		System.out.println(SK.comps[2].Dj);
+		SecretKey _SK = SerializeUtils.unserialize(SecretKey.class, SKFile);
+		System.out.println(_SK.comps[2].Dj);
 		return SK;
-//		SerializeUtils.serialize(SK, SKFile);
 	}
 
 	public static Ciphertext enc(Policy p, Element m, PublicKey PK){
