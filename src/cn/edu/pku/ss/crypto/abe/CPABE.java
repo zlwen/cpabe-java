@@ -5,6 +5,10 @@ import it.unisa.dia.gas.jpbc.Pairing;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 
 import cn.edu.pku.ss.crypto.abe.serialize.SerializeUtils;
 
@@ -16,22 +20,22 @@ public class CPABE {
 	}
 	
 	public static void setup(String PKFileName, String MKFileName){
-		File PKFile = new File(PKFileName);
-		File MKFile = new File(MKFileName);
-		if(!PKFile.exists()){
-			try {
-				PKFile.createNewFile();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		if(!MKFile.exists()){
-			try {
-				MKFile.createNewFile();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+//		File PKFile = new File(PKFileName);
+//		File MKFile = new File(MKFileName);
+//		if(!PKFile.exists()){
+//			try {
+//				PKFile.createNewFile();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//		if(!MKFile.exists()){
+//			try {
+//				MKFile.createNewFile();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
 		PublicKey PK = new PublicKey();
 		MasterKey MK = new MasterKey();
 		
@@ -83,17 +87,204 @@ public class CPABE {
 			SK.comps[i].Dj = g_r.mul(hash);
 			SK.comps[i]._Dj = PK.gp.duplicate().powZn(rj);
 		}
-		System.out.println(SK.comps[0].Dj);
-		SerializeUtils.serialize(SK, SKFile);
-		SecretKey _SK = SerializeUtils.unserialize(SecretKey.class, SKFile);
-		System.out.println(_SK.comps[0].Dj);
+//		SerializeUtils.serialize(SK, SKFile);
 	}
 
-	public static void enc(){
-		
+	public static void enc(Policy p, Element m, PublicKey PK){
+		fill_policy(p, m, PK);
+		Ciphertext ciphertext = new Ciphertext();
+		ciphertext.p = p;
+		Element s = pairing.getZr().newElement().setToRandom();
+		ciphertext.Cs = PK.g_hat_alpha.duplicate().powZn(s);
+		ciphertext.C = PK.h.duplicate().powZn(s); 
 	}
 
-	public static void dec(){
+	public static void dec(Ciphertext ciphertext, SecretKey SK, PublicKey PK){
+		check_sat(SK, ciphertext.p);
+		if(ciphertext.p.satisfiable != 1){
+			System.err.println("SK does not satisfies the policy!");
+			return;
+		}
+		pick_sat_min_leaves(ciphertext.p, SK);
+		Element r = dec_flatten(ciphertext.p, SK);
+		Element m = ciphertext.Cs.mul(r);
+		r = pairing.pairing(ciphertext.C, SK.D);
+		r.invert();
+		m.mul(r);
+	}
+	
+	private static Element dec_flatten(Policy p, SecretKey SK){
+		Element r = PairingManager.defaultPairing.getGT().newElement().setToOne();
+		Element one = PairingManager.defaultPairing.getZr().newElement().setToOne();
+		dec_node_flatten(r, one, p, SK);
+		return r;
+	}
+	
+	private static void dec_node_flatten(Element r, Element exp, 
+			Policy p, SecretKey SK){
+		assert(p.satisfiable == 1);
+		if(p.children.size() == 0){
+			dec_leaf_flatten(r, exp, p, SK);
+		}
+		else{
+			dec_internal_flatten(r, exp, p, SK);
+		}
+	}
+	
+	private static void dec_leaf_flatten(Element r, Element exp, 
+			Policy p, SecretKey SK){
+		SecretKey.SKComponent comp = SK.comps[p.attri];
+		Element s = pairing.pairing(p.Cy, comp.Dj);
+		Element t = pairing.pairing(p._Cy, comp._Dj);
+		t.invert();
+		s.mul(t);
+		s.powZn(exp);
+		r.mul(s);
+	}
+	
+	private static void dec_internal_flatten(Element r, Element exp,
+			 Policy p, SecretKey SK){
+		int i;
+		Element t;
+		Element expnew;
+		Element zero = PairingManager.defaultPairing.getZr().newElement().setToZero();
 		
+		for(i=0; i<p.satl.size(); i++){
+			t = lagrange_coef(p.satl, p.satl.get(i), zero);
+			expnew = exp.duplicate().mul(t);    //注意这里的duplicate
+			dec_node_flatten(r, expnew, p.children.get(p.satl.get(i)-1), SK);
+		}
+	}
+
+	
+	private static void pick_sat_min_leaves(Policy p, SecretKey SK){
+		int i,k,l;
+		Integer[] c;
+		assert(p.satisfiable == 1);
+		if(p.children.size() == 0){
+			p.min_leaves = 1;
+		}
+		else{
+			for(i=0; i<p.children.size(); i++){
+				if(p.children.get(i).satisfiable == 1){
+					pick_sat_min_leaves(p.children.get(i), SK);
+				}
+			}
+			
+			c = new Integer[p.children.size()];
+			for(i=0; i<p.children.size(); i++){
+				c[i] = i;
+			}
+			
+			Arrays.sort(c, new PolicyInnerComparator(p));
+			p.satl = new ArrayList<Integer>();
+			p.min_leaves = 0;
+			l = 0;
+			for(i=0; i<p.children.size() && l<p.k; i++){
+				if(p.children.get(i).satisfiable == 1){
+					l++;
+					p.min_leaves += p.children.get(i).min_leaves;
+					k = c[i] + 1;
+					p.satl.add(k);
+				}
+			}
+			assert(l == p.k);
+		}
+	}
+	
+	private static class PolicyInnerComparator implements Comparator<Integer>{
+		Policy p;
+		public PolicyInnerComparator(Policy p){
+			this.p = p;
+		}
+		
+		@Override
+		public int compare(Integer o1, Integer o2) {
+			int k, l;
+			k = p.children.get(o1).min_leaves;
+			l = p.children.get(o2).min_leaves;
+			
+			return k < l ? -1 : k == l ? 0 : 1;
+		}
+		
+	}
+	
+	private static void check_sat(SecretKey SK, Policy p){
+		int i,l;
+		p.satisfiable = 0;
+		if(p.children.size() == 0){
+			for(i=0; i<SK.comps.length; i++){
+				if(SK.comps[i].attr.equals(p.attr)){
+					p.satisfiable = 1;
+					p.attri = i;
+					break;
+				}
+			}
+		}
+		else{
+			for(i=0; i<p.children.size(); i++){
+				check_sat(SK, p.children.get(i));
+			}
+			
+			l = 0;
+			for(i=0; i<p.children.size(); i++){
+				if(p.children.get(i).satisfiable == 1){
+					l++;
+				}
+			}
+			if(l >= p.k){
+				p.satisfiable = 1;
+			}
+		}
+	}
+	
+	
+	public static void fill_policy(Policy p, Element e, PublicKey PK){
+		int i;
+		Element r, t;
+		p.q = rand_poly(p.k - 1, e);
+		if(p.children.size() == 0){
+			p.Cy = PK.g.duplicate().powZn(p.q.coef.get(0));
+			p._Cy = pairing.getG1().newElementFromBytes(p.attr.getBytes()).powZn(p.q.coef.get(0));
+		}
+		else{
+			for(i=0; i<p.children.size(); i++){
+				r = PairingManager.defaultPairing.getZr().newElement().set(i+1);
+				t = Polynomial.eval_poly(p.q, r);
+				fill_policy(p.children.get(i), t, PK);
+			}
+		}
+	}
+	
+	public static Polynomial rand_poly(int deg, Element zero_val){
+		int i;
+		Polynomial q = new Polynomial();
+		q.deg = deg;
+		q.coef = new ArrayList<Element>();
+
+		q.coef.add(zero_val.duplicate());
+		for(i=1; i<q.deg+1; i++){
+			q.coef.add(PairingManager.defaultPairing.getZr().newElement().setToRandom());
+		}
+		
+		return q;
+	}
+	
+	public static Element lagrange_coef(List<Integer> S, int i, Element x){
+		int j,k;
+		Element r = PairingManager.defaultPairing.getZr().newElement().setToOne();
+		Element t;
+		for(k=0; k<S.size(); k++){
+			j = S.get(k);
+			if(j == i){
+				continue;
+			}
+			t = x.duplicate().sub(PairingManager.defaultPairing.getZr().newElement().set(j));   //注意这里的duplicate
+			r.mul(t);
+			t.set(i-j).invert();
+			r.mul(t);
+		}
+		
+		return r;
 	}
 }

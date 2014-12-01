@@ -9,11 +9,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 
 import cn.edu.pku.ss.crypto.abe.PairingManager;
-import cn.edu.pku.ss.crypto.abe.SecretKey;
 import cn.edu.pku.ss.crypto.abe.SecretKey.SKComponent;
 
 public class SerializeUtils {
@@ -133,7 +131,7 @@ public class SerializeUtils {
 				} else if (field.getType() == String.class) {
 					String s = (String) field.get(obj);
 					dos.writeByte(SimpleSerializable.StringMark);
-					dos.writeBytes(s);
+					dos.writeUTF(s);
 				} else if (field.getType().isArray()) {
 					if (field.getType().getComponentType() == SKComponent.class) {
 						SKComponent[] array = (SKComponent[]) field.get(obj);
