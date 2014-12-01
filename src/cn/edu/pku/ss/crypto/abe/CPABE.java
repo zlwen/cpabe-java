@@ -15,9 +15,9 @@ public class CPABE {
 		setup();
 	}
 	
-	public static void setup(String PKPath, String MKPath){
-		File PKFile = new File(PKPath);
-		File MKFile = new File(MKPath);
+	public static void setup(String PKFileName, String MKFileName){
+		File PKFile = new File(PKFileName);
+		File MKFile = new File(MKFileName);
 		if(!PKFile.exists()){
 			try {
 				PKFile.createNewFile();
@@ -43,11 +43,10 @@ public class CPABE {
 		PK.h           = PK.g.duplicate().powZn(MK.beta);
 		PK.g_hat_alpha = pairing.pairing(PK.g, MK.g_alpha);
 		
-		System.out.println(PK.g);
-		
-		SerializeUtils.serialize(PK, PKFile);
-		PublicKey _PK = SerializeUtils.unserialize(PublicKey.class, PKFile);
-		System.out.println(_PK.g);
+//		SerializeUtils.serialize(PK, PKFile);
+//		SerializeUtils.serialize(MK, MKFile);
+		String[] attrs = new String[]{"PKU", "Student"};
+		keygen(attrs, PK, MK, null);
 	}
 	
 	public static void setup(){
@@ -56,8 +55,38 @@ public class CPABE {
 		setup(pk, mk);
 	}
 
-	public static void keygen(){
+	public static void keygen(String[] attrs, PublicKey PK, MasterKey MK, String SKFileName){
+		if(SKFileName == null || SKFileName.trim().equals("")){
+			SKFileName = "SecretKey";
+		}
+		File SKFile = new File(SKFileName);
+		if(!SKFile.exists()){
+			try {
+				SKFile.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		SecretKey SK = new SecretKey();
+		Element r = pairing.getZr().newElement().setToRandom();
+		Element g_r = PK.gp.duplicate().powZn(r);
+		SK.D = MK.g_alpha.duplicate().mul(g_r);
+		Element beta_inv = MK.beta.duplicate().invert();
+		SK.D.powZn(beta_inv);
+		SK.comps = new SecretKey.SKComponent[attrs.length];
 		
+		for(int i=0; i<attrs.length; i++){
+			Element rj = pairing.getZr().newElement().setToRandom();
+			Element hash = pairing.getG2().newElementFromBytes(attrs[i].getBytes()).powZn(rj);
+			SK.comps[i] = new SecretKey.SKComponent();
+			SK.comps[i].attr = attrs[i];
+			SK.comps[i].Dj = g_r.mul(hash);
+			SK.comps[i]._Dj = PK.gp.duplicate().powZn(rj);
+		}
+		System.out.println(SK.comps[0].Dj);
+		SerializeUtils.serialize(SK, SKFile);
+		SecretKey _SK = SerializeUtils.unserialize(SecretKey.class, SKFile);
+		System.out.println(_SK.comps[0].Dj);
 	}
 
 	public static void enc(){

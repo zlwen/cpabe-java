@@ -13,18 +13,20 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 
 import cn.edu.pku.ss.crypto.abe.PairingManager;
+import cn.edu.pku.ss.crypto.abe.SecretKey;
+import cn.edu.pku.ss.crypto.abe.SecretKey.SKComponent;
 
 public class SerializeUtils {
-	public static <T extends SimpleSerializable> T unserialize(Class<T> clazz, File file) {
+	private static <T extends SimpleSerializable> T _unserialize(
+			Class<T> clazz, DataInputStream dis) {
 		T t = null;
-		DataInputStream dis = null;
 		Field[] fields = clazz.getDeclaredFields();
 		try {
 			t = clazz.newInstance();
-			dis = new DataInputStream(new FileInputStream(file));
-
 			for (Field field : fields) {
+				field.setAccessible(true);
 				byte mark = dis.readByte();
+				// unserialize Element
 				if (field.getType() == Element.class) {
 					if (mark != SimpleSerializable.ElementMark) {
 						System.err.println("serialize error!");
@@ -35,47 +37,55 @@ public class SerializeUtils {
 					byte[] buffer = new byte[len];
 					String name = field.getName();
 					dis.read(buffer);
-					if(name.equals("g") || name.equals("h")){
-						e = PairingManager.defaultPairing.getG1().newElementFromBytes(buffer);
+					if (name.equals("g") || name.equals("h")) {
+						e = PairingManager.defaultPairing.getG1()
+								.newElementFromBytes(buffer);
+					} else if (name.equals("gp") || name.equals("g_alpha") 
+							|| name.equals("D") || name.equals("Dj") || name.equals("_Dj")) {
+						e = PairingManager.defaultPairing.getG2()
+								.newElementFromBytes(buffer);
+					} else if (name.equals("g_hat_alpha")) {
+						e = PairingManager.defaultPairing.getGT()
+								.newElementFromBytes(buffer);
+					} else if (name.equals("beta")) {
+						e = PairingManager.defaultPairing.getZr()
+								.newElementFromBytes(buffer);
 					}
-					else if(name.equals("gp") || name.equals("g_alpha")){
-						e = PairingManager.defaultPairing.getG2().newElementFromBytes(buffer);
-					}
-					else if(name.equals("g_hat_alpha")){
-						e = PairingManager.defaultPairing.getGT().newElementFromBytes(buffer);
-					}
-					else if(name.equals("beta")){
-						e = PairingManager.defaultPairing.getZr().newElementFromBytes(buffer);
-					}
-					field.setAccessible(true);
 					field.set(t, e);
 				}
-				else if(field.getType().isArray()){
-					if(mark != SimpleSerializable.ArrayMark){
+				// unserialize String
+				else if (field.getType() == String.class) {
+					if (mark != SimpleSerializable.StringMark) {
 						System.err.println("serialize error!");
 						return null;
 					}
-					int arrlen = dis.readInt();
-					Element[] es = new Element[arrlen];
-					for(int i=0; i<arrlen; i++){
-						mark = dis.readByte();
-						if(mark != SimpleSerializable.ElementMark){
-							System.err.println("serialize error!");
-							return null;
-						}
-						int len = dis.readInt();
-						byte[] buffer = new byte[len];
-						String name = field.getName();
-						dis.read(buffer);
-						if(name.equals("C")){
-							es[i] = PairingManager.defaultPairing.getG1().newElementFromBytes(buffer);
-						}
-						else if(name.equals("D")){
-							es[i] = PairingManager.defaultPairing.getG2().newElementFromBytes(buffer);
-						}
+					String s = dis.readUTF();
+					field.set(t, s);
+				}
+				// unserialize SKComponent
+				else if (field.getType() == SKComponent.class) {
+					if (mark != SimpleSerializable.SKComponentMark) {
+						System.err.println("serialize error!");
+						return null;
 					}
-					field.setAccessible(true);
-					field.set(t, es);
+					SKComponent comp = _unserialize(SKComponent.class, dis);
+					field.set(t, comp);
+				}
+				// unserialize SKComponent Array
+				else if (field.getType().isArray()) {
+					if (mark != SimpleSerializable.ArrayMark) {
+						System.err.println("serialize error!");
+						return null;
+					}
+					Class<?> c = field.getType().getComponentType();
+					int arrlen = dis.readInt();
+					if (c == SKComponent.class) {
+						SKComponent[] comps = new SKComponent[arrlen];
+						for (int i = 0; i < arrlen; i++) {
+							comps[i] = _unserialize(SKComponent.class, dis);
+						}
+						field.set(t, comps);
+					}
 				}
 			}
 		} catch (InstantiationException e) {
@@ -87,42 +97,78 @@ public class SerializeUtils {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
+
 		return t;
 	}
 
-	public static <T extends SimpleSerializable> void serialize(T obj, File file) {
-		if (file == null) {
-			System.err.println("Must set the file to hold key!");
-			return;
-		}
-		Field[] fields = obj.getClass().getDeclaredFields();
-		DataOutputStream dos = null;
+	public static <T extends SimpleSerializable> T unserialize(Class<T> clazz,
+			File file) {
+		DataInputStream dis = null;
 		try {
-			dos = new DataOutputStream(new FileOutputStream(file));
+			dis = new DataInputStream(new FileInputStream(file));
+			return _unserialize(clazz, dis);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				dis.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return null;
+	}
+
+	private static <T extends SimpleSerializable> void _serialize(T obj,
+			DataOutputStream dos) {
+		Field[] fields = obj.getClass().getDeclaredFields();
+		try {
 			for (Field field : fields) {
+				field.setAccessible(true);
 				if (field.getType() == Element.class) {
-					field.setAccessible(true);
 					Element e = (Element) field.get(obj);
 					dos.writeByte(SimpleSerializable.ElementMark);
 					dos.writeInt(e.toBytes().length);
 					dos.write(e.toBytes());
+				} else if (field.getType() == String.class) {
+					String s = (String) field.get(obj);
+					dos.writeByte(SimpleSerializable.StringMark);
+					dos.writeBytes(s);
 				} else if (field.getType().isArray()) {
-					field.setAccessible(true);
-					Array array = (Array) field.get(obj);
-					int len = Array.getLength(array);
-					dos.writeByte(SimpleSerializable.ArrayMark);
-					dos.writeInt(len);
-					for (int i = 0; i < len; i++) {
-						Element e = (Element) Array.get(array, i);
-						dos.writeByte(SimpleSerializable.ElementMark);
-						dos.writeInt(e.toBytes().length);
-						dos.write(e.toBytes());
+					if (field.getType().getComponentType() == SKComponent.class) {
+						SKComponent[] array = (SKComponent[]) field.get(obj);
+						int len = array.length;
+						dos.writeByte(SimpleSerializable.ArrayMark);
+						dos.writeInt(len);
+						for (int i = 0; i < len; i++) {
+							SKComponent comp = array[i];
+							_serialize(comp, dos);
+						}
 					}
 				}
 			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static <T extends SimpleSerializable> void serialize(T obj, File file) {
+		DataOutputStream dos = null;
+		try {
+			dos = new DataOutputStream(new FileOutputStream(file, true));
+			_serialize(obj, dos);
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			try {
+				dos.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 }
