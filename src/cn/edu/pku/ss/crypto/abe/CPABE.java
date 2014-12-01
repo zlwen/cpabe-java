@@ -60,14 +60,16 @@ public class CPABE {
 	
 	private static Policy testPolicy(){
 		Policy root = new Policy();
-		root.children = new ArrayList<Policy>();
+//		root.children = new ArrayList<Policy>();
+		root.children = new Policy[5];
 		root.k = 3;
 		
 		for(int i=0; i<5; i++){
 			Policy child = new Policy();
 			child.attr = "PKU" + i;
 			child.k = 1;
-			root.children.add(child);
+//			root.children.add(child);
+			root.children[i] = child;
 		}
 		return root;
 	}
@@ -147,7 +149,8 @@ public class CPABE {
 	private static void dec_node_flatten(Element r, Element exp, 
 			Policy p, SecretKey SK){
 		assert(p.satisfiable == 1);
-		if(p.children == null || p.children.size() == 0){
+//		if(p.children == null || size == 0){
+		if(p.children == null || p.children.length == 0){
 			dec_leaf_flatten(r, exp, p, SK);
 		}
 		else{
@@ -176,27 +179,35 @@ public class CPABE {
 		for(i=0; i<p.satl.size(); i++){
 			t = lagrange_coef(p.satl, p.satl.get(i), zero);
 			expnew = exp.duplicate().mul(t);    //注意这里的duplicate
-			dec_node_flatten(r, expnew, p.children.get(p.satl.get(i)-1), SK);
+//			dec_node_flatten(r, expnew, p.children.get(p.satl.get(i)-1), SK);
+			dec_node_flatten(r, expnew, p.children[p.satl.get(i)-1], SK);
 		}
 	}
 
 	
 	private static void pick_sat_min_leaves(Policy p, SecretKey SK){
 		int i,k,l;
+		int size = p.children == null ? 0 : p.children.length;
 		Integer[] c;
 		assert(p.satisfiable == 1);
-		if(p.children == null || p.children.size() == 0){
+//		if(p.children == null || size == 0){
+		if(p.children == null || p.children.length == 0){
 			p.min_leaves = 1;
 		}
 		else{
-			for(i=0; i<p.children.size(); i++){
-				if(p.children.get(i).satisfiable == 1){
-					pick_sat_min_leaves(p.children.get(i), SK);
+//			for(i=0; i<size; i++){
+//				if(p.children.get(i).satisfiable == 1){
+//					pick_sat_min_leaves(p.children.get(i), SK);
+//				}
+//			}
+			for(i=0; i<p.children.length; i++){
+				if(p.children[i].satisfiable == 1){
+					pick_sat_min_leaves(p.children[i], SK);
 				}
 			}
 			
-			c = new Integer[p.children.size()];
-			for(i=0; i<p.children.size(); i++){
+			c = new Integer[p.children.length];
+			for(i=0; i<size; i++){
 				c[i] = i;
 			}
 			
@@ -204,10 +215,10 @@ public class CPABE {
 			p.satl = new ArrayList<Integer>();
 			p.min_leaves = 0;
 			l = 0;
-			for(i=0; i<p.children.size() && l<p.k; i++){
-				if(p.children.get(i).satisfiable == 1){
+			for(i=0; i<size && l<p.k; i++){
+				if(p.children[i].satisfiable == 1){
 					l++;
-					p.min_leaves += p.children.get(i).min_leaves;
+					p.min_leaves += p.children[i].min_leaves;
 					k = c[i] + 1;
 					p.satl.add(k);
 				}
@@ -225,9 +236,11 @@ public class CPABE {
 		@Override
 		public int compare(Integer o1, Integer o2) {
 			int k, l;
-			k = p.children.get(o1).min_leaves;
-			l = p.children.get(o2).min_leaves;
+//			k = p.children.get(o1).min_leaves;
+//			l = p.children.get(o2).min_leaves;
 			
+			k = p.children[o1].min_leaves;
+			l = p.children[o2].min_leaves;
 			return k < l ? -1 : k == l ? 0 : 1;
 		}
 		
@@ -235,8 +248,9 @@ public class CPABE {
 	
 	private static void check_sat(SecretKey SK, Policy p){
 		int i,l;
+		int size = p.children == null ? 0 : p.children.length;
 		p.satisfiable = 0;
-		if(p.children == null || p.children.size() == 0){
+		if(p.children == null || size == 0){
 			for(i=0; i<SK.comps.length; i++){
 				if(SK.comps[i].attr.equals(p.attr)){
 					p.satisfiable = 1;
@@ -246,13 +260,13 @@ public class CPABE {
 			}
 		}
 		else{
-			for(i=0; i<p.children.size(); i++){
-				check_sat(SK, p.children.get(i));
+			for(i=0; i<size; i++){
+				check_sat(SK, p.children[i]);
 			}
 			
 			l = 0;
-			for(i=0; i<p.children.size(); i++){
-				if(p.children.get(i).satisfiable == 1){
+			for(i=0; i<size; i++){
+				if(p.children[i].satisfiable == 1){
 					l++;
 				}
 			}
@@ -265,17 +279,18 @@ public class CPABE {
 	
 	public static void fill_policy(Policy p, Element e, PublicKey PK){
 		int i;
+		int size = p.children == null ? 0 : p.children.length;
 		Element r, t;
 		p.q = rand_poly(p.k - 1, e);
-		if(p.children == null || p.children.size() == 0){
+		if(p.children == null || size == 0){
 			p.Cy = PK.g.duplicate().powZn(p.q.coef.get(0));
 			p._Cy = pairing.getG1().newElementFromBytes(p.attr.getBytes()).powZn(p.q.coef.get(0));
 		}
 		else{
-			for(i=0; i<p.children.size(); i++){
+			for(i=0; i<size; i++){
 				r = pairing.getZr().newElement().set(i+1);
 				t = Polynomial.eval_poly(p.q, r);
-				fill_policy(p.children.get(i), t, PK);
+				fill_policy(p.children[i], t, PK);
 			}
 		}
 	}

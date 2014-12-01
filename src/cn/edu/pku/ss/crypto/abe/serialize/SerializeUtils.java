@@ -10,8 +10,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 import cn.edu.pku.ss.crypto.abe.PairingManager;
+import cn.edu.pku.ss.crypto.abe.Policy;
 import cn.edu.pku.ss.crypto.abe.SecretKey.SKComponent;
 
 public class SerializeUtils {
@@ -38,8 +40,9 @@ public class SerializeUtils {
 					if (name.equals("g") || name.equals("h")) {
 						e = PairingManager.defaultPairing.getG1()
 								.newElementFromBytes(buffer);
-					} else if (name.equals("gp") || name.equals("g_alpha") 
-							|| name.equals("D") || name.equals("Dj") || name.equals("_Dj")) {
+					} else if (name.equals("gp") || name.equals("g_alpha")
+							|| name.equals("D") || name.equals("Dj")
+							|| name.equals("_Dj")) {
 						e = PairingManager.defaultPairing.getG2()
 								.newElementFromBytes(buffer);
 					} else if (name.equals("g_hat_alpha")) {
@@ -123,6 +126,9 @@ public class SerializeUtils {
 		try {
 			for (Field field : fields) {
 				field.setAccessible(true);
+				if (Modifier.isTransient(field.getModifiers())) {
+					continue;
+				}
 				if (field.getType() == Element.class) {
 					Element e = (Element) field.get(obj);
 					dos.writeByte(SimpleSerializable.ElementMark);
@@ -132,8 +138,17 @@ public class SerializeUtils {
 					String s = (String) field.get(obj);
 					dos.writeByte(SimpleSerializable.StringMark);
 					dos.writeUTF(s);
+				} else if (field.getType() == int.class) {
+					int i = field.getInt(obj);
+					dos.writeByte(SimpleSerializable.IntMark);
+					dos.writeInt(i);
+				} else if (field.getType() == Policy.class) {
+					Policy p = (Policy) field.get(obj);
+					dos.writeByte(SimpleSerializable.PolicyMark);
+					_serialize(p, dos);
 				} else if (field.getType().isArray()) {
-					if (field.getType().getComponentType() == SKComponent.class) {
+					Class<?> clazz = field.getType().getComponentType();
+					if (clazz == SKComponent.class) {
 						SKComponent[] array = (SKComponent[]) field.get(obj);
 						int len = array.length;
 						dos.writeByte(SimpleSerializable.ArrayMark);
@@ -142,6 +157,9 @@ public class SerializeUtils {
 							SKComponent comp = array[i];
 							_serialize(comp, dos);
 						}
+					}
+					else if(clazz == Policy.class){
+						
 					}
 				}
 			}
