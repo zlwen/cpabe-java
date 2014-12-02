@@ -54,6 +54,14 @@ public class SerializeUtils {
 					}
 					field.set(t, e);
 				}
+				else if (field.getType() == Policy.class){
+					if (mark != SimpleSerializable.PolicyMark) {
+						System.err.println("serialize error!");
+						return null;
+					}
+					Policy p = _unserialize(Policy.class, dis);
+					field.set(t, p);
+				}
 				// unserialize String
 				else if (field.getType() == String.class) {
 					if (mark != SimpleSerializable.StringMark) {
@@ -63,16 +71,7 @@ public class SerializeUtils {
 					String s = dis.readUTF();
 					field.set(t, s);
 				}
-				// unserialize SKComponent
-				else if (field.getType() == SKComponent.class) {
-					if (mark != SimpleSerializable.SKComponentMark) {
-						System.err.println("serialize error!");
-						return null;
-					}
-					SKComponent comp = _unserialize(SKComponent.class, dis);
-					field.set(t, comp);
-				}
-				// unserialize SKComponent Array
+				// unserialize Array
 				else if (field.getType().isArray()) {
 					if (mark != SimpleSerializable.ArrayMark) {
 						System.err.println("serialize error!");
@@ -86,6 +85,13 @@ public class SerializeUtils {
 							comps[i] = _unserialize(SKComponent.class, dis);
 						}
 						field.set(t, comps);
+					}
+					else if(c == Policy.class){
+						Policy[] ps = new Policy[arrlen];
+						for(int i=0; i<arrlen; i++){
+							ps[i] = _unserialize(Policy.class, dis);
+						}
+						field.set(t, ps);
 					}
 				}
 			}
@@ -137,13 +143,14 @@ public class SerializeUtils {
 					dos.write(e.toBytes());
 				} else if (type == String.class) {
 					String s = (String) field.get(obj);
+					s = ((s == null) ? "" : s);
 					dos.writeByte(SimpleSerializable.StringMark);
 					dos.writeUTF(s);
 				} else if (type == int.class) {
 					int i = field.getInt(obj);
 					dos.writeByte(SimpleSerializable.IntMark);
 					dos.writeInt(i);
-				} else if (type == Policy.class) {
+				} else if (type == Policy.class){
 					Policy p = (Policy) field.get(obj);
 					dos.writeByte(SimpleSerializable.PolicyMark);
 					_serialize(p, dos);
@@ -156,7 +163,6 @@ public class SerializeUtils {
 						dos.writeInt(len);
 						for (int i = 0; i < len; i++) {
 							SKComponent comp = array[i];
-							dos.writeByte(SimpleSerializable.SKComponentMark);
 							_serialize(comp, dos);
 						}
 					}

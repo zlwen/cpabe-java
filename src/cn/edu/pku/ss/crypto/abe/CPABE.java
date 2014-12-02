@@ -51,10 +51,11 @@ public class CPABE {
 //		SerializeUtils.serialize(MK, MKFile);
 		String[] attrs = new String[]{"PKU0", "PKU2", "PKU4"};
 		SecretKey SK = keygen(attrs, PK, MK, null);
-//		Policy p = testPolicy();
-//		Element m = pairing.getGT().newElement().setToRandom();
+		Policy p = testPolicy();
+		Element m = pairing.getGT().newElement().setToRandom();
 //		System.out.println(m);
-//		Ciphertext ciphertext = enc(p, m, PK);
+		Ciphertext ciphertext = enc(p, m, PK, "a.out");
+		
 //		dec(ciphertext, SK, PK);
 	}
 	
@@ -84,14 +85,7 @@ public class CPABE {
 		if(SKFileName == null || SKFileName.trim().equals("")){
 			SKFileName = "SecretKey";
 		}
-		File SKFile = new File(SKFileName);
-		if(!SKFile.exists()){
-			try {
-				SKFile.createNewFile();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		File SKFile = createNewFile(SKFileName);
 		SecretKey SK = new SecretKey();
 		Element r = pairing.getZr().newElement().setToRandom();
 		Element g_r = PK.gp.duplicate().powZn(r);
@@ -115,8 +109,31 @@ public class CPABE {
 		System.out.println(_SK.comps[2].Dj);
 		return SK;
 	}
+	
+	private static File createNewFile(String fileName){
+		File file = new File(fileName);
+		if(!file.exists()){
+			try {
+				file.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		else{
+			try {
+				String path = file.getCanonicalPath();
+				file.delete();
+				file = new File(path);
+				file.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return file;
+	}
 
-	public static Ciphertext enc(Policy p, Element m, PublicKey PK){
+	public static Ciphertext enc(Policy p, Element m, PublicKey PK, String ciphertextFileName){
+		File ciphertextFile = createNewFile(ciphertextFileName);
 		Element s = pairing.getZr().newElement().setToRandom();
 		fill_policy(p, s, PK);
 		Ciphertext ciphertext = new Ciphertext();
@@ -124,6 +141,10 @@ public class CPABE {
 		ciphertext.Cs = m.mul(PK.g_hat_alpha.duplicate().powZn(s));
 		ciphertext.C = PK.h.duplicate().powZn(s); 
 		
+		System.out.println(ciphertext.p.children[0].attr);
+		SerializeUtils.serialize(ciphertext, ciphertextFile);
+		Ciphertext _ciphertext = SerializeUtils.unserialize(Ciphertext.class, ciphertextFile);
+		System.out.println(_ciphertext.p.children[0].attr);
 		return ciphertext;
 	}
 
