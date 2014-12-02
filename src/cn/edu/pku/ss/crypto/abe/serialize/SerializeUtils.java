@@ -25,19 +25,27 @@ public class SerializeUtils {
 			t = clazz.newInstance();
 			for (Field field : fields) {
 				field.setAccessible(true);
+				if (Modifier.isTransient(field.getModifiers())) {
+					continue;
+				}
 				byte mark = dis.readByte();
 				// unserialize Element
 				if (field.getType() == Element.class) {
 					if (mark != SimpleSerializable.ElementMark) {
-						System.err.println("serialize error!");
+						System.err.println("serialize Element error!");
 						return null;
 					}
 					Element e = null;
 					int len = dis.readInt();
+					if (len == 0) {
+						field.set(t, null);
+						continue;
+					}
 					byte[] buffer = new byte[len];
 					String name = field.getName();
 					dis.read(buffer);
-					if (name.equals("g") || name.equals("h")) {
+					if (name.equals("g") || name.equals("h") || name.equals("C")
+							|| name.equals("Cy") || name.equals("_Cy")) {
 						e = PairingManager.defaultPairing.getG1()
 								.newElementFromBytes(buffer);
 					} else if (name.equals("gp") || name.equals("g_alpha")
@@ -45,7 +53,7 @@ public class SerializeUtils {
 							|| name.equals("_Dj")) {
 						e = PairingManager.defaultPairing.getG2()
 								.newElementFromBytes(buffer);
-					} else if (name.equals("g_hat_alpha")) {
+					} else if (name.equals("g_hat_alpha") || name.equals("Cs")) {
 						e = PairingManager.defaultPairing.getGT()
 								.newElementFromBytes(buffer);
 					} else if (name.equals("beta")) {
@@ -53,10 +61,9 @@ public class SerializeUtils {
 								.newElementFromBytes(buffer);
 					}
 					field.set(t, e);
-				}
-				else if (field.getType() == Policy.class){
+				} else if (field.getType() == Policy.class) {
 					if (mark != SimpleSerializable.PolicyMark) {
-						System.err.println("serialize error!");
+						System.err.println("serialize Policy error!");
 						return null;
 					}
 					Policy p = _unserialize(Policy.class, dis);
@@ -65,30 +72,46 @@ public class SerializeUtils {
 				// unserialize String
 				else if (field.getType() == String.class) {
 					if (mark != SimpleSerializable.StringMark) {
-						System.err.println("serialize error!");
+						System.err.println("serialize String error!");
 						return null;
 					}
 					String s = dis.readUTF();
 					field.set(t, s);
 				}
+				else if (field.getType() == int.class){
+					if (mark != SimpleSerializable.IntMark) {
+						System.err.println("serialize Int error!");
+						return null;
+					}
+					int i = dis.readInt();
+					field.set(t,i);
+				}
 				// unserialize Array
 				else if (field.getType().isArray()) {
 					if (mark != SimpleSerializable.ArrayMark) {
-						System.err.println("serialize error!");
+						System.err.println("serialize Array error!");
 						return null;
 					}
 					Class<?> c = field.getType().getComponentType();
 					int arrlen = dis.readInt();
+					if(arrlen == 0){
+						field.set(t, null);
+						continue;
+					}
 					if (c == SKComponent.class) {
 						SKComponent[] comps = new SKComponent[arrlen];
 						for (int i = 0; i < arrlen; i++) {
 							comps[i] = _unserialize(SKComponent.class, dis);
 						}
 						field.set(t, comps);
-					}
-					else if(c == Policy.class){
+					} else if (c == Policy.class) {
 						Policy[] ps = new Policy[arrlen];
-						for(int i=0; i<arrlen; i++){
+						for (int i = 0; i < arrlen; i++) {
+							mark = dis.readByte();
+							if(mark != SimpleSerializable.PolicyMark){
+								System.err.println("serialize Policy error!");
+								return null;
+							}
 							ps[i] = _unserialize(Policy.class, dis);
 						}
 						field.set(t, ps);
@@ -139,8 +162,11 @@ public class SerializeUtils {
 				if (type == Element.class) {
 					Element e = (Element) field.get(obj);
 					dos.writeByte(SimpleSerializable.ElementMark);
-					dos.writeInt(e.toBytes().length);
-					dos.write(e.toBytes());
+					int len = e == null ? 0 : e.toBytes().length;
+					dos.writeInt(len);
+					if (e != null) {
+						dos.write(e.toBytes());
+					}
 				} else if (type == String.class) {
 					String s = (String) field.get(obj);
 					s = ((s == null) ? "" : s);
@@ -150,7 +176,7 @@ public class SerializeUtils {
 					int i = field.getInt(obj);
 					dos.writeByte(SimpleSerializable.IntMark);
 					dos.writeInt(i);
-				} else if (type == Policy.class){
+				} else if (type == Policy.class) {
 					Policy p = (Policy) field.get(obj);
 					dos.writeByte(SimpleSerializable.PolicyMark);
 					_serialize(p, dos);
@@ -165,12 +191,14 @@ public class SerializeUtils {
 							SKComponent comp = array[i];
 							_serialize(comp, dos);
 						}
-					}
-					else if(clazz == Policy.class){
+					} else if (clazz == Policy.class) {
 						Policy[] array = (Policy[]) field.get(obj);
-						int len = array.length;
+						int len = array == null ? 0 : array.length;
 						dos.writeByte(SimpleSerializable.ArrayMark);
 						dos.writeInt(len);
+						if(len == 0){
+							continue;
+						}
 						for (int i = 0; i < len; i++) {
 							Policy p = array[i];
 							dos.writeByte(SimpleSerializable.PolicyMark);
