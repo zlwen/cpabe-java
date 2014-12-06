@@ -131,6 +131,17 @@ public class CPABE {
 		}
 		return file;
 	}
+	
+	private static boolean isEmptyString(String s){
+		return s == null ? true : s.trim().equals("") ? true : false;
+	}
+	
+	public static void enc(String policy, String PKFileName, String toBeEncryptedFileName, 
+			String outputFileName){
+		Parser parser = new Parser();
+		Policy p = parser.parse(policy);
+		PublicKey PK = SerializeUtils.unserialize(PublicKey.class, new File(PKFileName));
+	}
 
 	public static Ciphertext enc(Policy p, Element m, PublicKey PK, String ciphertextFileName){
 		File ciphertextFile = createNewFile(ciphertextFileName);

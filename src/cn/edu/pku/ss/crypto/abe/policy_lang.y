@@ -23,7 +23,7 @@ policy:   ATTR                       { $$.obj = leaf_policy($1.sval);        }
 arg_list: policy                     { $$.obj = new ArrayList<Policy>();
                                        ((List<Policy>)$$.obj).add((Policy)$1.obj); }
         | arg_list ',' policy        { $$ = $1;
-                                       ((List<Policy>)$$.obj).add((Policy)$1.obj); }
+                                       ((List<Policy>)$$.obj).add((Policy)$3.obj); }
 ;
 
 %%
@@ -32,7 +32,7 @@ StringTokenizer st;
 
 public Policy parse(String input){
 	input = input.replaceAll("\n", "");
-	this.st = new StringTokenizer(input, " \t\r\f,");
+	this.st = new StringTokenizer(input, " \t\r\f");
 	yyparse();
 	return this.res;
 }

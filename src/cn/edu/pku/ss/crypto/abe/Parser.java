@@ -292,9 +292,18 @@ final static String yyrule[] = {
 private Policy res;
 StringTokenizer st;
 
-public Policy parse(String input){
+private String normalize(String input){
 	input = input.replaceAll("\n", "");
-	this.st = new StringTokenizer(input, " \t\r\f,");
+	input = input.replaceAll(",", " , ");
+	input = input.replaceAll("(", " ( ");
+	input = input.replaceAll(")", " ) ");
+	
+	return input;
+}
+
+public Policy parse(String input){
+	input = normalize(input);
+	this.st = new StringTokenizer(input, " \t\r\f");
 	yyparse();
 	return this.res;
 }
@@ -306,7 +315,7 @@ private int yylex(){
 		return 0;
 	}
 	s = st.nextToken();
-	if(s.equals("(") || s.equals(")")){
+	if(s.equals("(") || s.equals(")") || s.equals(",")){
 		tok = s.charAt(0);
 		yylval = new ParserVal(s);
 	}
@@ -364,7 +373,15 @@ Policy kof2_policy(int k, Policy l, Policy r){
 	return p;
 }
 
+void log(String msg){
+	System.out.println("-----------------------");
+	System.err.println(msg);
+	System.out.println("-----------------------");
+}
+
 Policy kof_policy(int k, List<Policy> list){
+	log("k=" + k);
+	log("list size=" + list.size());
 	Policy p = new Policy();
 	p.k = k;
 	p.children = new Policy[list.size()];
@@ -552,12 +569,12 @@ break;
 case 7:
 //#line 23 "policy_lang.y"
 { yyval.obj = new ArrayList<Policy>();
-                                       ((List<Policy>)yyval.obj).add((Policy)val_peek(0).obj); }
+                                       ((List<Policy>)yyval.obj).add((Policy)(val_peek(0).obj)); }
 break;
 case 8:
 //#line 25 "policy_lang.y"
 { yyval = val_peek(2);
-                                       ((List<Policy>)yyval.obj).add((Policy)val_peek(2).obj); }
+                                       ((List<Policy>)yyval.obj).add((Policy)(val_peek(0).obj)); }
 break;
 //#line 484 "Parser.java"
 //########## END OF USER-SUPPLIED ACTIONS ##########
@@ -639,7 +656,7 @@ public Parser(boolean debugMe)
 //###############################################################
 
 public static void main(String[] args) {
-	String input = "2 of (abc, bcd,cde)";
+	String input = "kkk & ( 2 of ( abc , bcd , cde ) )";
 	Parser parser = new Parser(true);
 	Policy p = parser.parse(input);
 	System.out.println(p.k);
