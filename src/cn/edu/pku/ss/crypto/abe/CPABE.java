@@ -49,14 +49,14 @@ public class CPABE {
 		
 //		SerializeUtils.serialize(PK, PKFile);
 //		SerializeUtils.serialize(MK, MKFile);
-		String[] attrs = new String[]{"PKU0", "PKU2", "PKU4"};
+		String[] attrs = new String[]{"北京大学0", "北京大学2", "北京大学4"};
 		SecretKey SK = keygen(attrs, PK, MK, null);
 		Policy p = testPolicy();
 		Element m = pairing.getGT().newElement().setToRandom();
-//		System.out.println(m);
+		System.out.println(m);
 		Ciphertext ciphertext = enc(p, m, PK, "a.out");
 		
-//		dec(ciphertext, SK, PK);
+		dec(ciphertext, SK, PK);
 	}
 	
 	private static Policy testPolicy(){
@@ -67,7 +67,7 @@ public class CPABE {
 		
 		for(int i=0; i<5; i++){
 			Policy child = new Policy();
-			child.attr = "PKU" + i;
+			child.attr = "北京大学" + i;
 			child.k = 1;
 //			root.children.add(child);
 			root.children[i] = child;

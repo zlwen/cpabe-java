@@ -2,6 +2,7 @@ package cn.edu.pku.ss.crypto.abe;
 
 import it.unisa.dia.gas.jpbc.Element;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import cn.edu.pku.ss.crypto.abe.serialize.SimpleSerializable;
@@ -14,7 +15,7 @@ public class Policy implements SimpleSerializable{
 	Element _Cy;     /* G_1, only for leaves */
 //	List<Policy> children; /* pointers to bswabe_policy_t's, len == 0 for leaves */
 	Policy[] children;
-
+	
 	/* only used during encryption */
 	transient Polynomial q;
 

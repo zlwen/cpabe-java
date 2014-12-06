@@ -1,4 +1,8 @@
-
+%{
+	import java.util.List;
+	import java.util.StringTokenizer;
+	import java.util.ArrayList;
+%}
 %token  ATTR 
 %token  NUM
 
@@ -8,24 +12,30 @@
 
 %%
 
-result: policy { res = $1 }
+result: policy { res = (Policy)$1.obj; }
 
-policy:   ATTR                       { $$ = leaf_policy($1);        }
-        | policy OR  policy          { $$ = kof2_policy(1, $1, $3); }
-        | policy AND policy          { $$ = kof2_policy(2, $1, $3); }
-        | NUM OF '(' arg_list ')'    { $$ = kof_policy($1, $4);     }
+policy:   ATTR                       { $$.obj = leaf_policy($1.sval);        }
+        | policy OR  policy          { $$.obj = kof2_policy(1, (Policy)$1.obj, (Policy)$3.obj); }
+        | policy AND policy          { $$.obj = kof2_policy(2, (Policy)$1.obj, (Policy)$3.obj); }
+        | NUM OF '(' arg_list ')'    { $$.obj = kof_policy($1.ival, (List<Policy>)$4.obj);     }
         | '(' policy ')'             { $$ = $2;                     }
 
-arg_list: policy                     { $$ = new ArrayList<Policy>();
-                                       $$.add($1); }
+arg_list: policy                     { $$.obj = new ArrayList<Policy>();
+                                       ((List<Policy>)$$.obj).add((Policy)$1.obj); }
         | arg_list ',' policy        { $$ = $1;
-                                       $$.add($1); }
+                                       ((List<Policy>)$$.obj).add((Policy)$1.obj); }
 ;
 
 %%
 private Policy res;
-String input;
 StringTokenizer st;
+
+public Policy parse(String input){
+	input = input.replaceAll("\n", "");
+	this.st = new StringTokenizer(input, " \t\r\f,");
+	yyparse();
+	return this.res;
+}
 
 private int yylex(){
 	String s;
@@ -34,7 +44,11 @@ private int yylex(){
 		return 0;
 	}
 	s = st.nextToken();
-	if(s.equals("&") || s.toLowerCase().equals("and")){
+	if(s.equals("(") || s.equals(")")){
+		tok = s.charAt(0);
+		yylval = new ParserVal(s);
+	}
+	else if(s.equals("&") || s.toLowerCase().equals("and")){
 		tok = AND;
 		yylval = new ParserVal(s);
 	}
@@ -56,7 +70,7 @@ private int yylex(){
 		}
 		if(isNum){
 			tok = NUM;
-			yylval = new ParserVal(Integer.parserInt(s));
+			yylval = new ParserVal(Integer.parseInt(s));
 		}
 		else{
 			tok = ATTR;
