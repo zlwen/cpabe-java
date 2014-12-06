@@ -295,8 +295,8 @@ StringTokenizer st;
 private String normalize(String input){
 	input = input.replaceAll("\n", "");
 	input = input.replaceAll(",", " , ");
-	input = input.replaceAll("(", " ( ");
-	input = input.replaceAll(")", " ) ");
+	input = input.replaceAll("\\(", " ( ");
+	input = input.replaceAll("\\)", " ) ");
 	
 	return input;
 }
@@ -373,15 +373,8 @@ Policy kof2_policy(int k, Policy l, Policy r){
 	return p;
 }
 
-void log(String msg){
-	System.out.println("-----------------------");
-	System.err.println(msg);
-	System.out.println("-----------------------");
-}
 
 Policy kof_policy(int k, List<Policy> list){
-	log("k=" + k);
-	log("list size=" + list.size());
 	Policy p = new Policy();
 	p.k = k;
 	p.children = new Policy[list.size()];

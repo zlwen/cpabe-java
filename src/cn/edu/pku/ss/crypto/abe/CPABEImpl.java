@@ -12,30 +12,26 @@ import java.util.List;
 
 import cn.edu.pku.ss.crypto.abe.serialize.SerializeUtils;
 
-public class CPABE {
+public class CPABEImpl {
 	private static Pairing pairing = PairingManager.defaultPairing;
 
-	public static void main(String[] args) {
-		setup();
-	}
-	
 	public static void setup(String PKFileName, String MKFileName){
-//		File PKFile = new File(PKFileName);
-//		File MKFile = new File(MKFileName);
-//		if(!PKFile.exists()){
-//			try {
-//				PKFile.createNewFile();
-//			} catch (IOException e) {
-//				e.printStackTrace();
-//			}
-//		}
-//		if(!MKFile.exists()){
-//			try {
-//				MKFile.createNewFile();
-//			} catch (IOException e) {
-//				e.printStackTrace();
-//			}
-//		}
+		File PKFile = new File(PKFileName);
+		File MKFile = new File(MKFileName);
+		if(!PKFile.exists()){
+			try {
+				PKFile.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		if(!MKFile.exists()){
+			try {
+				MKFile.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		PublicKey PK = new PublicKey();
 		MasterKey MK = new MasterKey();
 		
@@ -47,32 +43,8 @@ public class CPABE {
 		PK.h           = PK.g.duplicate().powZn(MK.beta);
 		PK.g_hat_alpha = pairing.pairing(PK.g, MK.g_alpha);
 		
-//		SerializeUtils.serialize(PK, PKFile);
-//		SerializeUtils.serialize(MK, MKFile);
-		String[] attrs = new String[]{"北京大学0", "北京大学2", "北京大学4"};
-		SecretKey SK = keygen(attrs, PK, MK, null);
-		Policy p = testPolicy();
-		Element m = pairing.getGT().newElement().setToRandom();
-		System.out.println(m);
-		Ciphertext ciphertext = enc(p, m, PK, "a.out");
-		
-		dec(ciphertext, SK, PK);
-	}
-	
-	private static Policy testPolicy(){
-		Policy root = new Policy();
-//		root.children = new ArrayList<Policy>();
-		root.children = new Policy[5];
-		root.k = 3;
-		
-		for(int i=0; i<5; i++){
-			Policy child = new Policy();
-			child.attr = "北京大学" + i;
-			child.k = 1;
-//			root.children.add(child);
-			root.children[i] = child;
-		}
-		return root;
+		SerializeUtils.serialize(PK, PKFile);
+		SerializeUtils.serialize(MK, MKFile);
 	}
 	
 	public static void setup(){
@@ -81,7 +53,7 @@ public class CPABE {
 		setup(pk, mk);
 	}
 
-	public static SecretKey keygen(String[] attrs, PublicKey PK, MasterKey MK, String SKFileName){
+	public static void keygen(String[] attrs, PublicKey PK, MasterKey MK, String SKFileName){
 		if(SKFileName == null || SKFileName.trim().equals("")){
 			SKFileName = "SecretKey";
 		}
@@ -104,10 +76,6 @@ public class CPABE {
 		}
 		
 		SerializeUtils.serialize(SK, SKFile);
-		System.out.println(SK.comps[2].Dj);
-		SecretKey _SK = SerializeUtils.unserialize(SecretKey.class, SKFile);
-		System.out.println(_SK.comps[2].Dj);
-		return SK;
 	}
 	
 	private static File createNewFile(String fileName){
@@ -132,19 +100,8 @@ public class CPABE {
 		return file;
 	}
 	
-	private static boolean isEmptyString(String s){
-		return s == null ? true : s.trim().equals("") ? true : false;
-	}
-	
-	public static void enc(String policy, String PKFileName, String toBeEncryptedFileName, 
-			String outputFileName){
-		Parser parser = new Parser();
-		Policy p = parser.parse(policy);
-		PublicKey PK = SerializeUtils.unserialize(PublicKey.class, new File(PKFileName));
-	}
-
-	public static Ciphertext enc(Policy p, Element m, PublicKey PK, String ciphertextFileName){
-		File ciphertextFile = createNewFile(ciphertextFileName);
+	public static void enc(Policy p, Element m, PublicKey PK, String outputFileName){
+		File ciphertextFile = createNewFile(outputFileName);
 		Element s = pairing.getZr().newElement().setToRandom();
 		fill_policy(p, s, PK);
 		Ciphertext ciphertext = new Ciphertext();
@@ -152,18 +109,14 @@ public class CPABE {
 		ciphertext.Cs = m.mul(PK.g_hat_alpha.duplicate().powZn(s));
 		ciphertext.C = PK.h.duplicate().powZn(s); 
 		
-		System.out.println(ciphertext.p.children[0].attr);
 		SerializeUtils.serialize(ciphertext, ciphertextFile);
-		Ciphertext _ciphertext = SerializeUtils.unserialize(Ciphertext.class, ciphertextFile);
-		System.out.println(_ciphertext.p.children[0].attr);
-		return ciphertext;
 	}
 
-	public static void dec(Ciphertext ciphertext, SecretKey SK, PublicKey PK){
+	public static Element dec(Ciphertext ciphertext, SecretKey SK, PublicKey PK){
 		check_sat(SK, ciphertext.p);
 		if(ciphertext.p.satisfiable != 1){
 			System.err.println("SK does not satisfies the policy!");
-			return;
+			return null;
 		}
 		pick_sat_min_leaves(ciphertext.p, SK);
 		Element r = dec_flatten(ciphertext.p, SK);
@@ -171,7 +124,8 @@ public class CPABE {
 		r = pairing.pairing(ciphertext.C, SK.D);
 		r.invert();
 		m.mul(r);
-		System.out.println("dec:" + m);
+		
+		return m;
 	}
 	
 	private static Element dec_flatten(Policy p, SecretKey SK){
@@ -184,7 +138,6 @@ public class CPABE {
 	private static void dec_node_flatten(Element r, Element exp, 
 			Policy p, SecretKey SK){
 		assert(p.satisfiable == 1);
-//		if(p.children == null || size == 0){
 		if(p.children == null || p.children.length == 0){
 			dec_leaf_flatten(r, exp, p, SK);
 		}
@@ -214,7 +167,6 @@ public class CPABE {
 		for(i=0; i<p.satl.size(); i++){
 			t = lagrange_coef(p.satl, p.satl.get(i), zero);
 			expnew = exp.duplicate().mul(t);    //注意这里的duplicate
-//			dec_node_flatten(r, expnew, p.children.get(p.satl.get(i)-1), SK);
 			dec_node_flatten(r, expnew, p.children[p.satl.get(i)-1], SK);
 		}
 	}
@@ -225,16 +177,10 @@ public class CPABE {
 		int size = p.children == null ? 0 : p.children.length;
 		Integer[] c;
 		assert(p.satisfiable == 1);
-//		if(p.children == null || size == 0){
 		if(p.children == null || p.children.length == 0){
 			p.min_leaves = 1;
 		}
 		else{
-//			for(i=0; i<size; i++){
-//				if(p.children.get(i).satisfiable == 1){
-//					pick_sat_min_leaves(p.children.get(i), SK);
-//				}
-//			}
 			for(i=0; i<p.children.length; i++){
 				if(p.children[i].satisfiable == 1){
 					pick_sat_min_leaves(p.children[i], SK);
@@ -271,9 +217,6 @@ public class CPABE {
 		@Override
 		public int compare(Integer o1, Integer o2) {
 			int k, l;
-//			k = p.children.get(o1).min_leaves;
-//			l = p.children.get(o2).min_leaves;
-			
 			k = p.children[o1].min_leaves;
 			l = p.children[o2].min_leaves;
 			return k < l ? -1 : k == l ? 0 : 1;
