@@ -17,7 +17,7 @@ import cn.edu.pku.ss.crypto.abe.Policy;
 import cn.edu.pku.ss.crypto.abe.SecretKey.SKComponent;
 
 public class SerializeUtils {
-	private static <T extends SimpleSerializable> T _unserialize(
+	public static <T extends SimpleSerializable> T _unserialize(
 			Class<T> clazz, DataInputStream dis) {
 		T t = null;
 		Field[] fields = clazz.getDeclaredFields();
@@ -127,7 +127,6 @@ public class SerializeUtils {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
 		return t;
 	}
 
@@ -148,6 +147,7 @@ public class SerializeUtils {
 		}
 		return null;
 	}
+	
 
 	private static <T extends SimpleSerializable> void _serialize(T obj,
 			DataOutputStream dos) {

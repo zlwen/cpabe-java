@@ -2,18 +2,25 @@ package cn.edu.pku.ss.crypto.abe.api;
 
 import it.unisa.dia.gas.jpbc.Element;
 
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+
+import javax.crypto.Cipher;
 
 import cn.edu.pku.ss.crypto.abe.CPABEImpl;
 import cn.edu.pku.ss.crypto.abe.Ciphertext;
 import cn.edu.pku.ss.crypto.abe.MasterKey;
-import cn.edu.pku.ss.crypto.abe.PairingManager;
 import cn.edu.pku.ss.crypto.abe.Parser;
 import cn.edu.pku.ss.crypto.abe.Policy;
 import cn.edu.pku.ss.crypto.abe.PublicKey;
 import cn.edu.pku.ss.crypto.abe.SecretKey;
 import cn.edu.pku.ss.crypto.abe.serialize.SerializeUtils;
+import cn.edu.pku.ss.crypto.aes.AES;
 
 public class CPABE {
 	public static final String Default_PKFileName = "PublicKey";
@@ -30,6 +37,7 @@ public class CPABE {
 	public static final String Error_Enc_Directory = "Can not encrypt a directory!";
 	
 	public static void main(String[] args) {
+		CPABEImpl.debug = true;
 		String encFileName = "README.md";
 		String ciphertextFileName = "test.cpabe";
 		String PKFileName = "PKFile";
@@ -86,8 +94,6 @@ public class CPABE {
 			err(Error_PK_Missing);
 			return;
 		}
-		Element m = PairingManager.defaultPairing.getGT().newRandomElement();
-		System.out.println("enc:" + m);
 		PublicKey PK = SerializeUtils.unserialize(PublicKey.class, new File(PKFileName));
 		if(PK == null){
 			err(Error_PK_Missing);
@@ -99,7 +105,7 @@ public class CPABE {
 			err(Error_Policy_Missing);
 			return;
 		}
-		CPABEImpl.enc(p, m, PK, outputFileName);
+		CPABEImpl.enc(encFile, p, PK, outputFileName);
 	}
 	
 	public static void keygen(String[] attrs, String PKFileName, String MKFileName, String SKFileName){
@@ -138,7 +144,15 @@ public class CPABE {
 			err(Error_SK_Missing);
 			return;
 		}
-		Ciphertext ciphertext = SerializeUtils.unserialize(Ciphertext.class, new File(ciphertextFileName));
+
+		DataInputStream dis = null;
+		try {
+			dis = new DataInputStream(new FileInputStream(new File(ciphertextFileName)));
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+//		Ciphertext ciphertext = SerializeUtils.unserialize(Ciphertext.class, new File(ciphertextFileName));
+		Ciphertext ciphertext = SerializeUtils._unserialize(Ciphertext.class, dis);
 		if(ciphertext == null){
 			err(Error_Ciphertext_Missing);
 			return;
@@ -153,7 +167,24 @@ public class CPABE {
 			err(Error_SK_Missing);
 			return;
 		}
+		
+		String output = null;
+		if(ciphertextFileName.endsWith(".cpabe")){
+			int end = ciphertextFileName.indexOf(".cpabe");
+			output = ciphertextFileName.substring(0, end);
+		}
+		else{
+			output = ciphertextFileName + ".out";
+		}
+		File outputFile = CPABEImpl.createNewFile(output);
+		OutputStream os = null;
+		try {
+			os =  new FileOutputStream(outputFile);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
 		Element m = CPABEImpl.dec(ciphertext, SK, PK);
-		System.out.println("dec:" + m);
+		AES.crypto(Cipher.DECRYPT_MODE, dis, os, m);
 	}
+	
 }

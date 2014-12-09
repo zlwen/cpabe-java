@@ -4,17 +4,24 @@ import it.unisa.dia.gas.jpbc.Element;
 import it.unisa.dia.gas.jpbc.Pairing;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import javax.crypto.Cipher;
+
 import cn.edu.pku.ss.crypto.abe.serialize.SerializeUtils;
+import cn.edu.pku.ss.crypto.aes.AES;
 
 public class CPABEImpl {
 	private static Pairing pairing = PairingManager.defaultPairing;
-
+	public static boolean debug = false;
+	
 	public static void setup(String PKFileName, String MKFileName){
 		File PKFile = new File(PKFileName);
 		File MKFile = new File(MKFileName);
@@ -78,7 +85,7 @@ public class CPABEImpl {
 		SerializeUtils.serialize(SK, SKFile);
 	}
 	
-	private static File createNewFile(String fileName){
+	public static File createNewFile(String fileName){
 		File file = new File(fileName);
 		if(!file.exists()){
 			try {
@@ -100,18 +107,39 @@ public class CPABEImpl {
 		return file;
 	}
 	
-	public static void enc(Policy p, Element m, PublicKey PK, String outputFileName){
+	public static void enc(File file, Policy p, PublicKey PK, String outputFileName){
 		File ciphertextFile = createNewFile(outputFileName);
+		Element m = PairingManager.defaultPairing.getGT().newRandomElement();
+		if(debug){
+			System.out.println("in function enc() m:" + m);
+		}
 		Element s = pairing.getZr().newElement().setToRandom();
 		fill_policy(p, s, PK);
 		Ciphertext ciphertext = new Ciphertext();
 		ciphertext.p = p;
-		ciphertext.Cs = m.mul(PK.g_hat_alpha.duplicate().powZn(s));
+		//此处m.duplicate()是为了后面AES加密中还需要用到m
+		ciphertext.Cs = m.duplicate().mul(PK.g_hat_alpha.duplicate().powZn(s));
 		ciphertext.C = PK.h.duplicate().powZn(s); 
 		
 		SerializeUtils.serialize(ciphertext, ciphertextFile);
+		FileInputStream fis = null;
+		FileOutputStream fos = null;
+		try {
+			fis = new FileInputStream(file);
+			fos = new FileOutputStream(ciphertextFile, true);
+			AES.crypto(Cipher.ENCRYPT_MODE, fis, fos, m);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}finally{
+			try {
+				fis.close();
+				fos.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
-
+	
 	public static Element dec(Ciphertext ciphertext, SecretKey SK, PublicKey PK){
 		check_sat(SK, ciphertext.p);
 		if(ciphertext.p.satisfiable != 1){
@@ -125,6 +153,9 @@ public class CPABEImpl {
 		r.invert();
 		m.mul(r);
 		
+		if(debug){
+			System.out.println("In function dec() m:" + m);
+		}
 		return m;
 	}
 	
