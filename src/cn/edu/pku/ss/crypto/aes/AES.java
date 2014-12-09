@@ -52,7 +52,6 @@ public class AES {
 			byte[] block = new byte[8];
 			int i;
 			while ((i = is.read(block)) != -1) {
-				System.out.println(Arrays.toString(block));
 			    cos.write(block, 0, i);
 			}
 			cos.close();

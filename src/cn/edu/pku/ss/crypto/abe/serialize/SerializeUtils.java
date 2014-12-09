@@ -42,24 +42,38 @@ public class SerializeUtils {
 						continue;
 					}
 					byte[] buffer = new byte[len];
-					String name = field.getName();
+//					String name = field.getName();
+					Serializable annotation = field.getAnnotation(Serializable.class);
+					String group = annotation.group();
 					dis.read(buffer);
-					if (name.equals("g") || name.equals("h") || name.equals("C")
-							|| name.equals("Cy") || name.equals("_Cy")) {
-						e = PairingManager.defaultPairing.getG1()
-								.newElementFromBytes(buffer);
-					} else if (name.equals("gp") || name.equals("g_alpha")
-							|| name.equals("D") || name.equals("Dj")
-							|| name.equals("_Dj")) {
-						e = PairingManager.defaultPairing.getG2()
-								.newElementFromBytes(buffer);
-					} else if (name.equals("g_hat_alpha") || name.equals("Cs")) {
-						e = PairingManager.defaultPairing.getGT()
-								.newElementFromBytes(buffer);
-					} else if (name.equals("beta")) {
-						e = PairingManager.defaultPairing.getZr()
-								.newElementFromBytes(buffer);
+					if(group.equals("Zr")){
+						e = PairingManager.defaultPairing.getZr().newElementFromBytes(buffer);
 					}
+					else if(group.equals("G1")){
+						e = PairingManager.defaultPairing.getG1().newElementFromBytes(buffer);
+					}
+					else if(group.equals("G2")){
+						e = PairingManager.defaultPairing.getG2().newElementFromBytes(buffer);
+					}
+					else if(group.equals("GT")){
+						e = PairingManager.defaultPairing.getGT().newElementFromBytes(buffer);
+					}
+//					if (name.equals("g") || name.equals("h") || name.equals("C")
+//							|| name.equals("Cy") || name.equals("_Cy")) {
+//						e = PairingManager.defaultPairing.getG1()
+//								.newElementFromBytes(buffer);
+//					} else if (name.equals("gp") || name.equals("g_alpha")
+//							|| name.equals("D") || name.equals("Dj")
+//							|| name.equals("_Dj")) {
+//						e = PairingManager.defaultPairing.getG2()
+//								.newElementFromBytes(buffer);
+//					} else if (name.equals("g_hat_alpha") || name.equals("Cs")) {
+//						e = PairingManager.defaultPairing.getGT()
+//								.newElementFromBytes(buffer);
+//					} else if (name.equals("beta")) {
+//						e = PairingManager.defaultPairing.getZr()
+//								.newElementFromBytes(buffer);
+//					}
 					field.set(t, e);
 				} else if (field.getType() == Policy.class) {
 					if (mark != SimpleSerializable.PolicyMark) {
