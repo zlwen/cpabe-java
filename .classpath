@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="lib/jpbc-api-2.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/jpbc-plaf-2.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/fastjson-1.1.41.jar" sourcepath="C:/Users/wenzilong/.m2/repository/com/alibaba/fastjson/1.1.41/fastjson-1.1.41-sources.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6">
+		<attributes>
+			<attribute name="owner.project.facets" value="java"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

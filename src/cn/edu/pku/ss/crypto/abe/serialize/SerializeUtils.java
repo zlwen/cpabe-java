@@ -9,6 +9,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
@@ -244,5 +246,39 @@ public class SerializeUtils {
 				e.printStackTrace();
 			}
 		}
+	}
+	
+	public static <T extends SimpleSerializable> T constructFromByteArray(Class<T> clazz, byte[] b){
+		File tmp = null;
+		try {
+			tmp = File.createTempFile("random", "bytearray");
+			OutputStream os = new FileOutputStream(tmp);
+			os.write(b);
+			os.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return unserialize(clazz, tmp);
+	}
+	
+	public static <T extends SimpleSerializable> byte[] convertToByteArray(T obj){
+		File tmp = null;
+		try {
+			tmp = File.createTempFile("random", "bytearray");
+			SerializeUtils.serialize(obj, tmp);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		byte[] buf = new byte[(int) tmp.length()];
+		try {
+			InputStream is = new FileInputStream(tmp);
+			is.read(buf);
+			is.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return buf;
 	}
 }
